@@ -1,0 +1,5 @@
+We have tentatively agreed on the following for environment standards:
+
+1) Scala 2.10.x
+2) Spark 1.0
+3) IBM java 1.6
