@@ -1,0 +1,62 @@
+*****************************************************************************
+PROBLEM
+*****************************************************************************
+Generate a key-value pair dataset using the Hadoop examples jar.  Run that 
+generated dataset through the Hadoop examples jar sort code.  Build a Spark
+routine (using the Scala implementation) that takes the same generated
+dataset and sorts it so they output from both match.  Determine which method
+sorts the data faster.
+
+*****************************************************************************
+HARDWARE
+*****************************************************************************
+HP Z600 Workstation
+
+
+*****************************************************************************
+RESULTS
+*****************************************************************************
+Overall, sorting on the local PC went as well as could be expected.  Both 
+sorting programs ran quickly, however Spark was faster.  The Spark program
+ran in 3 seconds, where the map/reduce code ran in 13 seconds.  I had to 
+tweak the map/reduce code to only use 1 reducer.  Before that change, it 
+took 136 seconds to run.  I also added the following two lines to the Spark conf:
+
+SPARK_WORK_MEMORY=2G
+SPARK_MEM=2G
+
+This allowed Spark to use 2 gigabytes of memory while running the code.  By
+default, Spark uses 512 MB.  I made this change in hopes that I would be able
+to run the entire HiBench dataset through.  
+
+*****************************************************************************
+ISSUES
+*****************************************************************************
+Here were a few things that I had to learn about to make this work.  The first
+issue that I ran into was Serialization with the Hadoop data type Text.  The
+Text data type is not Serializable.  This is an issue because Spark must be
+able to serialize data being sent to the work nodes.  It is core to it's
+design.  The work around for this is to convert the data from Text to String.
+I tried to extend Serialize to the Text class, but had no luck making this
+work.
+
+The second issue was the map/reduce code was trying to sort over 48 mappers.
+While the map/reduce codes was sorting by the key (just like Spark), it was
+not sorting the same way.  Map/reduce will sort each part locally by default.
+It will not perform a global sort unless you pass the correct partitioner.
+This concept is further explained here ->
+https://www.inkling.com/read/hadoop-definitive-guide-tom-white-3rd/chapter-8/sorting.
+The correct way to handle this issue is with a partitioner that respects
+global sort order.  This is not the way I handled for this exercise.  I
+changed the number of reducers from 48 to 1.  This is not the best way to
+handle it because you would lose all benefits of running parallel.  This was
+not an issue because I am running local on 4GB of RAM.
+
+The third issue I had is the codec that was chosen by Spark and Map/Reduce.
+The Map/Reduce code was using the default codec when writing out sequence
+files.  Spark was not using any codec, causing the output not to be
+compressed.  The choice of codec determines how the output will be compressed.
+Once I figured out how to pass the default codec class to the Spark save
+method, the output then was stored using the same compression.
+
+
